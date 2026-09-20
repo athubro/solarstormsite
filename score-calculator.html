@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Score Calculator · 27019 Solar Storm</title>
+<meta name="description" content="Live BIOBUZZ match score calculator built by FTC Team 27019 Solar Storm.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" type="image/png" href="favicon.png">
+
+<style>
+  /* ============================================
+     Score calculator — page-specific styles
+     Uses the site tokens from assets/style.css
+     ============================================ */
+  :root{
+    --red-team:  #FF3D5E;
+    --blue-team: #4FD3FF;
+  }
+
+  .calc-hero{ padding: 72px 0 44px; border-bottom: 1px solid var(--line); position:relative; overflow:hidden; }
+  .calc-hero h1{ font-size: clamp(36px, 5vw, 60px); margin-bottom: 10px; }
+  .calc-hero p{ max-width: 620px; margin-bottom: 0; }
+
+  /* ---------- Scoreboard ---------- */
+  .scoreboard{
+    position: sticky; top: 72px; z-index: 40;
+    background: rgba(10,12,22,0.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    padding: 16px 0;
+  }
+  .board-row{ display:grid; grid-template-columns: 1fr auto 1fr; align-items:center; gap: 18px; }
+  .board-side{ display:flex; flex-direction:column; gap:6px; }
+  .board-side.blue{ align-items:flex-end; text-align:right; }
+  .board-name{ font-family: var(--mono); font-size: 11.5px; letter-spacing:0.16em; text-transform:uppercase; }
+  .board-side.red .board-name{ color: var(--red-team); }
+  .board-side.blue .board-name{ color: var(--blue-team); }
+  .board-score{ font-family: var(--display); font-weight:700; font-size: clamp(34px, 6vw, 54px); line-height:1; font-variant-numeric: tabular-nums; }
+  .board-side.red .board-score{ color: var(--red-team); }
+  .board-side.blue .board-score{ color: var(--blue-team); }
+  .board-rp{ font-family: var(--mono); font-size: 11.5px; color: var(--slate); }
+  .board-rp b{ color: var(--paper); font-weight:500; }
+  .board-mid{
+    font-family: var(--mono); font-size: 11px; letter-spacing:0.14em; text-transform:uppercase;
+    color: var(--slate); border:1px solid var(--line); border-radius:100px; padding:6px 14px; white-space:nowrap;
+  }
+  .board-mid[data-result="red"]{ color: var(--red-team); border-color: rgba(255,61,94,0.5); }
+  .board-mid[data-result="blue"]{ color: var(--blue-team); border-color: rgba(79,211,255,0.5); }
+
+  /* ---------- Panels ---------- */
+  .calc-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 900px){ .calc-grid{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background: var(--panel); border:1px solid var(--line); border-radius: 12px;
+    padding: 24px; border-top-width: 3px;
+  }
+  .panel.red{ border-top-color: var(--red-team); }
+  .panel.blue{ border-top-color: var(--blue-team); }
+  .panel-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom: 20px; }
+  .panel-head h2{ font-size: 20px; margin:0; }
+  .panel.red .panel-head h2{ color: var(--red-team); }
+  .panel.blue .panel-head h2{ color: var(--blue-team); }
+  .panel-sub{ font-family: var(--mono); font-size: 11px; color: var(--slate); letter-spacing:0.08em; }
+
+  .phase{ font-family: var(--mono); font-size: 11px; letter-spacing:0.16em; text-transform:uppercase;
+    color: var(--corona); padding-bottom: 8px; border-bottom:1px solid var(--line); margin: 26px 0 6px; }
+  .phase:first-of-type{ margin-top: 0; }
+
+  .row{
+    display:flex; align-items:center; justify-content:space-between; gap: 16px;
+    padding: 12px 0; border-bottom: 1px solid rgba(42,47,74,0.5);
+  }
+  .row:last-child{ border-bottom:none; }
+  .row-label{ font-size: 14.5px; font-weight:500; }
+  .row-label span{ display:block; font-family: var(--mono); font-size: 10.5px; color: var(--slate); letter-spacing:0.06em; margin-top:2px; }
+
+  /* Toggles */
+  .toggle-pair{ display:flex; gap:8px; }
+  .toggle{
+    font-family: var(--mono); font-size: 11.5px; letter-spacing:0.06em;
+    background: var(--panel-2); color: var(--slate);
+    border:1px solid var(--line); border-radius: 6px;
+    padding: 9px 13px; cursor:pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .toggle:hover{ border-color: var(--flare); }
+  .toggle[aria-pressed="true"]{ background: var(--flare); border-color: var(--flare); color: #150900; }
+
+  /* Steppers */
+  .stepper{ display:flex; align-items:center; border:1px solid var(--line); border-radius:6px; overflow:hidden; background: var(--panel-2); }
+  .stepper button{
+    width: 34px; height: 38px; background:none; border:0; color: var(--paper);
+    font-size: 17px; line-height:1; cursor:pointer; transition: background 0.15s ease, color 0.15s ease;
+  }
+  .stepper button:hover{ background: var(--flare); color:#150900; }
+  .stepper input{
+    width: 46px; height: 38px; text-align:center; background:none; border:0;
+    color: var(--paper); font-family: var(--mono); font-size: 15px;
+    -moz-appearance: textfield;
+  }
+  .stepper input::-webkit-outer-spin-button,
+  .stepper input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+
+  /* Segmented owner picker */
+  .seg{ display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .seg button{
+    background: var(--panel-2); border:0; border-right:1px solid var(--line);
+    color: var(--slate); font-family: var(--mono); font-size: 11px; letter-spacing:0.08em;
+    padding: 9px 12px; cursor:pointer; transition: background 0.15s ease, color 0.15s ease;
+  }
+  .seg button:last-child{ border-right:0; }
+  .seg button:hover{ color: var(--paper); }
+  .seg button[aria-pressed="true"][data-value="red"]{ background: var(--red-team); color: var(--void); }
+  .seg button[aria-pressed="true"][data-value="blue"]{ background: var(--blue-team); color: var(--void); }
+  .seg button[aria-pressed="true"][data-value="none"]{ background: var(--line); color: var(--paper); }
+
+  /* Flower board */
+  .flower-grid{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  @media (max-width: 1000px){ .flower-grid{ grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px){ .flower-grid{ grid-template-columns: 1fr; } }
+  .flower{ background: var(--panel); border:1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .flower h3{ font-size: 16px; margin-bottom: 14px; }
+  .flower .field{ margin-bottom: 14px; }
+  .flower .field:last-child{ margin-bottom:0; }
+  .flower .field-label{ font-family: var(--mono); font-size: 10.5px; letter-spacing:0.1em; text-transform:uppercase; color: var(--slate); margin-bottom:7px; }
+
+  /* Breakdown */
+  .breakdown{ width:100%; border-collapse: collapse; font-size: 14px; }
+  .breakdown th, .breakdown td{ padding: 11px 10px; border-bottom: 1px solid var(--line); text-align:right; font-variant-numeric: tabular-nums; }
+  .breakdown th:first-child, .breakdown td:first-child{ text-align:left; }
+  .breakdown thead th{ font-family: var(--mono); font-size: 10.5px; letter-spacing:0.1em; text-transform:uppercase; color: var(--slate); font-weight:400; }
+  .breakdown thead th.c-red{ color: var(--red-team); }
+  .breakdown thead th.c-blue{ color: var(--blue-team); }
+  .breakdown td{ color: var(--slate); font-family: var(--mono); }
+  .breakdown td:first-child{ font-family: var(--body); color: var(--paper); }
+  .breakdown tr.sum td{ color: var(--paper); font-size: 15px; }
+  .breakdown tr.grand td{ color: var(--paper); font-size: 17px; border-bottom:none; }
+  .breakdown tr.grand{ border-top: 2px solid var(--line); }
+
+  .rp-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+  .rp-list li{ display:flex; align-items:center; gap:10px; font-size: 14px; color: var(--slate); }
+  .rp-dot{ width:9px; height:9px; border-radius:50%; background: var(--line); flex-shrink:0; }
+  .rp-list li.earned{ color: var(--paper); }
+  .rp-list li.earned .rp-dot{ background: var(--corona); box-shadow: 0 0 0 4px rgba(255,182,39,0.15); }
+  .rp-note{ font-family: var(--mono); font-size: 11px; color: var(--slate); margin-left:auto; }
+
+  .toolbar{ display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-top: 28px; }
+  .threshold-row{ display:flex; flex-wrap:wrap; gap:22px; align-items:center; }
+  .threshold{ display:flex; align-items:center; gap:10px; }
+  .threshold label{ font-family: var(--mono); font-size: 11px; letter-spacing:0.08em; text-transform:uppercase; color: var(--slate); }
+  .threshold input{
+    width: 64px; padding: 8px 10px; background: var(--panel-2); border:1px solid var(--line);
+    border-radius:6px; color: var(--paper); font-family: var(--mono); font-size: 13px; text-align:center;
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="wrap">
+    <a href="index.html" class="brand">
+      <span class="brand-mark"></span>
+      <span>27019 Solar Storm
+        <small>FTC &middot; Clarksville, MD</small>
+      </span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="team.html">Meet the Team</a>
+      <a>Seasons</a>
+      <a href="score-calculator.html" class="active">Score Calculator</a>
+      <a href="sponsorship.html">Sponsorship</a>
+      <a href="contact.html">Contact</a>
+    </div>
+    <button class="nav-toggle" aria-label="Toggle menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+</nav>
+
+<section class="calc-hero">
+  <div class="flare-burst"></div>
+  <div class="wrap">
+    <div class="eyebrow">BIOBUZZ &middot; Manual v TU01</div>
+    <h1>Score calculator</h1>
+    <p>Tally a full BIOBUZZ match &mdash; both alliances, both periods, flower ownership, penalties, and ranking points. Everything updates as you tap.</p>
+  </div>
+</section>
+
+<div class="scoreboard">
+  <div class="wrap">
+    <div class="board-row">
+      <div class="board-side red">
+        <div class="board-name">Red alliance</div>
+        <div class="board-score" id="board-red">0</div>
+        <div class="board-rp">RP <b id="board-red-rp">0</b></div>
+      </div>
+      <div class="board-mid" id="board-result">Tied</div>
+      <div class="board-side blue">
+        <div class="board-name">Blue alliance</div>
+        <div class="board-score" id="board-blue">0</div>
+        <div class="board-rp">RP <b id="board-blue-rp">0</b></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section style="padding-top:56px;">
+  <div class="wrap">
+    <div class="calc-grid" id="alliance-panels">
+
+      <!-- ============ RED ============ -->
+      <div class="panel red" data-alliance="red">
+        <div class="panel-head">
+          <h2>Red alliance</h2>
+          <div class="panel-sub" id="red-panel-total">0 pts</div>
+        </div>
+
+        <div class="phase">Autonomous &middot; 0:30</div>
+        <div class="row">
+          <div class="row-label">Leave<span>3 pts per robot</span></div>
+          <div class="toggle-pair">
+            <button class="toggle" data-toggle="red_leave1" aria-pressed="false">Robot 1</button>
+            <button class="toggle" data-toggle="red_leave2" aria-pressed="false">Robot 2</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-label">Park in loading zone<span>5 pts per robot</span></div>
+          <div class="toggle-pair">
+            <button class="toggle" data-toggle="red_apark1" aria-pressed="false">Robot 1</button>
+            <button class="toggle" data-toggle="red_apark2" aria-pressed="false">Robot 2</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-label">Hive tips<span>20 pts each</span></div>
+          <div class="stepper" data-stepper="red_atips"><button type="button" data-step="-1" aria-label="Decrease">&minus;</button><input type="number" value="0" min="0" max="30" inputmode="numeric"><button type="button" data-step="1" aria-label="Increase">+</button></div>
+        </div>
+
+        <div class="phase">Teleop &middot; 2:00</div>
+        <div class="row">
+          <div class="row-label">Park in loading zone<span>5 pts per robot</span></div>
+          <div class="toggle-pair">
+            <button class="toggle" data-toggle="red_tpark1" aria-pressed="false">Robot 1</button>
+            <button class="toggle" data-toggle="red_tpark2" aria-pressed="false">Robot 2</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-label">Hive tips<span>20 pts each</span></div>
+          <div class="stepper" data-stepper="red_ttips"><button type="button" data-step="-1" aria-label="Decrease">&minus;</button><input type="number" value="0" min="0" max="30" inputmode="numeric"><button type="button" data-step="1" aria-label="Increase">+</button></div>
+        </div>
+        <div class="row">
+          <div class="row-label">Pollen &amp; nectar left in cell<span>2 pts each, upward-facing cell</span></div>
+          <div class="stepper" data-stepper="red_cell"><button type="button" data-step="-1" aria-label="Decrease">&minus;</button><input type="number" value="0" min="0" max="60" inputmode="numeric"><button type="button" data-step="1" aria-label="Increase">+</button></div>
+        </div>
+        <div class="row">
+          <div class="row-label">Pollen &amp; nectar in garden<span>1 pt each</span></div>
+          <div class="stepper" data-stepper="red_garden"><button type="button" data-step="-1" aria-label="Decrease">&minus;</button><input type="number" value="0" min="0" max="60" inputmode="numeric"><button type="button" data-step="1" aria-label="Increase">+</button></div>
+        </div>
+
+        <div class="phase">Penalties committed</div>
+        <div class="row">
+          <div class="row-label">Minor fouls<span>5 pts credited to blue</span></div>
+          <div class="stepper" data-stepper="red_minor"><button type="button" data-step="-1" aria-label="Decrease">&minus;</button><input type="number" value="0" min="0" max="50" inputmode="numeric"><button type="button" data-step="1" aria-label="Increase">+</button></div>
+        </div>
+        <div class="row">
+          <div class="row-label">Major fouls<span>20 pts credited to blue</span></div>
+          <div class="stepper" data-stepper="red_major"><button type="button" data-step="-1" aria-label="Decrease">&minus;</button><input type="number" value="0" min="0" max="50" inputmode="numeric"><button type="button" data-step="1" aria-label="Increase">+</button></div>
+        </div>
+      </div>
+
+      <!-- ============ BLUE ============ -->
+      <div class="panel blue" data-alliance="blue">
+        <div class="panel-head">
+          <h2>Blue alliance</h2>
+          <div class="panel-sub" id="blue-panel-total">0 pts</div>
+        </div>
+
+        <div class="phase">Autonomous &middot; 0:30</div>
+        <div class="row">
+          <div class="row-label">Leave<span>3 pts per robot</span></div>
+          <div class="toggle-pair">
+            <button class="toggle" data-toggle="blue_leave1" aria-pressed="false">Robot 1</button>
+            <button class="toggle" data-toggle="blue_leave2" aria-pressed="false">Robot 2</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-label">Park in loading zone<span>5 pts per robot</span></div>
+          <div class="toggle-pair">
+            <button class="toggle" data-toggle="blue_apark1" aria-pressed="false">Robot 1</button>
+            <button class="toggle" data-toggle="blue_apark2" aria-pressed="false">Robot 2</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-label">Hive tips<span>20 pts each</span></div>
+          <div class="stepper" data-stepper="blue_atips"><button type="button" data-step="-1" aria-label="Decrease">&minus;</button><input type="number" value="0" min="0" max="30" inputmode="numeric"><button type="button" data-step="1" aria-label="Increase">+</button></div>
+        </div>
+
+        <div class="phase">Teleop &middot; 2:00</div>
+        <div class="row">
+          <div class="row-label">Park in loading zone<span>5 pts per robot</span></div>
+          <div class="toggle-pair">
+            <button class="toggle" data-toggle="blue_tpark1" aria-pressed="false">Robot 1</button>
+            <button class="toggle" data-toggle="blue_tpark2" aria-pressed="false">Robot 2</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-label">Hive tips<span>20 pts each</span></div>
+          <div class="stepper" data-stepper="blue_ttips"><button type="button" data-step="-1" aria-label="Decrease">&minus;</button><input type="number" value="0" min="0" max="30" inputmode="numeric"><button type="button" data-step="1" aria-label="Increase">+</button></div>
+        </div>
+        <div class="row">
+          <div class="row-label">Pollen &amp; nectar left in cell<span>2 pts each, upward-facing cell</span></div>
+          <div class="stepper" data-stepper="blue_cell"><button type="button" data-step="-1" aria-label="Decrease">&minus;</button><input type="number" value="0" min="0" max="60" inputmode="numeric"><button type="button" data-step="1" aria-label="Increase">+</button></div>
+        </div>
+        <div class="row">
+          <div class="row-label">Pollen &amp; nectar in garden<span>1 pt each</span></div>
+          <div class="stepper" data-stepper="blue_garden"><button type="button" data-step="-1" aria-label="Decrease">&minus;</button><input type="number" value="0" min="0" max="60" inputmode="numeric"><button type="button" data-step="1" aria-label="Increase">+</button></div>
+        </div>
+
+        <div class="phase">Penalties committed</div>
+        <div class="row">
+          <div class="row-label">Minor fouls<span>5 pts credited to red</span></div>
+          <div class="stepper" data-stepper="blue_minor"><button type="button" data-step="-1" aria-label="Decrease">&minus;</button><input type="number" value="0" min="0" max="50" inputmode="numeric"><button type="button" data-step="1" aria-label="Increase">+</button></div>
+        </div>
+        <div class="row">
+          <div class="row-label">Major fouls<span>20 pts credited to red</span></div>
+          <div class="stepper" data-stepper="blue_major"><button type="button" data-step="-1" aria-label="Decrease">&minus;</button><input type="number" value="0" min="0" max="50" inputmode="numeric"><button type="button" data-step="1" aria-label="Increase">+</button></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ FLOWERS ============ -->
+<section style="padding-top:0;">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Shared field elements</div>
+      <h2>Flowers</h2>
+      <p>Only one alliance can own a flower, so set them here. The owner &mdash; whoever has the top-most nectar of their colour &mdash; scores 2 pts for every pollen and nectar in that flower, no matter who put it there. The bottom-most nectar earns its alliance a 5 pt bonus.</p>
+    </div>
+    <div class="flower-grid" id="flowers"></div>
+  </div>
+</section>
+
+<!-- ============ RESULTS ============ -->
+<section style="padding-top:0;">
+  <div class="wrap">
+    <div class="grid grid-2">
+      <div class="card">
+        <h3 style="margin-bottom:18px;">Match breakdown</h3>
+        <table class="breakdown">
+          <thead>
+            <tr><th>Achievement</th><th class="c-red">Red</th><th class="c-blue">Blue</th></tr>
+          </thead>
+          <tbody id="breakdown-body"></tbody>
+        </table>
+      </div>
+
+      <div>
+        <div class="card" style="margin-bottom:24px;">
+          <h3 style="margin-bottom:18px;">Ranking points</h3>
+          <div class="grid grid-2" style="gap:24px;">
+            <div>
+              <div class="panel-sub" style="color:var(--red-team); margin-bottom:14px;">RED</div>
+              <ul class="rp-list" id="rp-red"></ul>
+            </div>
+            <div>
+              <div class="panel-sub" style="color:var(--blue-team); margin-bottom:14px;">BLUE</div>
+              <ul class="rp-list" id="rp-blue"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-bottom:8px;">RP thresholds</h3>
+          <p style="font-size:13.5px;">Defaults are the published values for league meets, qualifiers and other events. Championship thresholds are announced in team updates &mdash; change them here when they land.</p>
+          <div class="threshold-row">
+            <div class="threshold">
+              <label for="th-swarm">Swarm</label>
+              <input type="number" id="th-swarm" value="16" min="0" inputmode="numeric">
+            </div>
+            <div class="threshold">
+              <label for="th-p1">Pollinator 1</label>
+              <input type="number" id="th-p1" value="4" min="0" inputmode="numeric">
+            </div>
+            <div class="threshold">
+              <label for="th-p2">Pollinator 2</label>
+              <input type="number" id="th-p2" value="7" min="0" inputmode="numeric">
+            </div>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-primary" id="copy-btn" type="button">Copy match summary</button>
+            <button class="btn btn-ghost" id="reset-btn" type="button">Reset match</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="footer-fine" style="margin-top:34px;">
+      Point values from the BIOBUZZ Competition Manual, Table 10-2 and Table 10-3 (version TU01). This calculator is a practice and scouting aid built by team 27019 &mdash; the head referee's call is always the real score.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-row">
+      <div class="footer-brand">
+        <span class="brand-mark" style="width:26px;height:26px;"></span>
+        27019 Solar Storm
+      </div>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="team.html">Team</a>
+        <a href="seasons.html">Seasons</a>
+        <a href="score-calculator.html">Score Calculator</a>
+        <a href="sponsorship.html">Sponsorship</a>
+        <a href="contact.html">Contact</a>
+      </div>
+    </div>
+    <div class="divider" style="margin-top:28px;"></div>
+    <p class="footer-fine">FTC TEAM 27019 &middot; FIRST TECH CHALLENGE &middot; BUILT BY THE SOLAR STORM SOFTWARE SUBTEAM</p>
+  </div>
+</footer>
+
+<script src="assets/nav.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- Point values (Table 10-2) ---------- */
+  var PTS = {
+    leave: 3,
+    park: 5,
+    tip: 20,
+    cell: 2,
+    flowerElement: 2,
+    bottomNectar: 5,
+    garden: 1,
+    minorFoul: 5,
+    majorFoul: 20
+  };
+
+  /* ---------- State ---------- */
+  var toggles = {};   // id -> bool
+  var counts  = {};   // id -> number
+  var flowers = [];   // { owner:'none'|'red'|'blue', elements:n, bottom:'none'|'red'|'blue' }
+
+  for (var f = 0; f < 4; f++) flowers.push({ owner:'none', elements:0, bottom:'none' });
+
+  /* ---------- Build flower cards ---------- */
+  function buildFlowers(){
+    var host = document.getElementById('flowers');
+    var html = '';
+    for (var i = 0; i < 4; i++){
+      html +=
+        '<div class="flower">' +
+          '<h3>Flower ' + (i+1) + '</h3>' +
+          '<div class="field">' +
+            '<div class="field-label">Owner</div>' +
+            '<div class="seg" data-seg="owner" data-flower="' + i + '">' +
+              '<button type="button" data-value="none" aria-pressed="true">None</button>' +
+              '<button type="button" data-value="red" aria-pressed="false">Red</button>' +
+              '<button type="button" data-value="blue" aria-pressed="false">Blue</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="field">' +
+            '<div class="field-label">Pollen &amp; nectar inside</div>' +
+            '<div class="stepper" data-flower-count="' + i + '">' +
+              '<button type="button" data-step="-1" aria-label="Decrease">&minus;</button>' +
+              '<input type="number" value="0" min="0" max="40" inputmode="numeric">' +
+              '<button type="button" data-step="1" aria-label="Increase">+</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="field">' +
+            '<div class="field-label">Bottom nectar bonus</div>' +
+            '<div class="seg" data-seg="bottom" data-flower="' + i + '">' +
+              '<button type="button" data-value="none" aria-pressed="true">None</button>' +
+              '<button type="button" data-value="red" aria-pressed="false">Red</button>' +
+              '<button type="button" data-value="blue" aria-pressed="false">Blue</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    }
+    host.innerHTML = html;
+  }
+
+  /* ---------- Helpers ---------- */
+  function t(id){ return toggles[id] ? 1 : 0; }
+  function c(id){ return counts[id] || 0; }
+
+  function clamp(el, val){
+    var min = parseInt(el.getAttribute('min'), 10); if (isNaN(min)) min = 0;
+    var max = parseInt(el.getAttribute('max'), 10); if (isNaN(max)) max = 999;
+    if (isNaN(val)) val = min;
+    return Math.min(max, Math.max(min, val));
+  }
+
+  /* ---------- Scoring ---------- */
+  function flowerPoints(color){
+    var pts = 0;
+    for (var i = 0; i < flowers.length; i++){
+      if (flowers[i].owner === color) pts += flowers[i].elements * PTS.flowerElement;
+      if (flowers[i].bottom === color) pts += PTS.bottomNectar;
+    }
+    return pts;
+  }
+
+  function score(color){
+    var other = color === 'red' ? 'blue' : 'red';
+
+    var leave = (t(color+'_leave1') + t(color+'_leave2')) * PTS.leave;
+    var autoPark = (t(color+'_apark1') + t(color+'_apark2')) * PTS.park;
+    var teleopPark = (t(color+'_tpark1') + t(color+'_tpark2')) * PTS.park;
+
+    var autoTips = c(color+'_atips');
+    var teleopTips = c(color+'_ttips');
+
+    var s = {
+      leave: leave,
+      autoPark: autoPark,
+      autoTips: autoTips * PTS.tip,
+      teleopPark: teleopPark,
+      teleopTips: teleopTips * PTS.tip,
+      cell: c(color+'_cell') * PTS.cell,
+      flower: flowerPoints(color),
+      garden: c(color+'_garden') * PTS.garden,
+      penalty: c(other+'_minor') * PTS.minorFoul + c(other+'_major') * PTS.majorFoul,
+      tips: autoTips + teleopTips,
+      swarmPoints: leave + autoPark + teleopPark
+    };
+
+    s.auto = s.leave + s.autoPark + s.autoTips;
+    s.teleop = s.teleopPark + s.teleopTips + s.cell + s.flower + s.garden;
+    s.total = s.auto + s.teleop + s.penalty;
+    return s;
+  }
+
+  /* ---------- Rendering ---------- */
+  var BREAKDOWN_ROWS = [
+    { label:'Auto leave',            key:'leave' },
+    { label:'Auto park',             key:'autoPark' },
+    { label:'Auto hive tips',        key:'autoTips' },
+    { label:'Auto subtotal',         key:'auto', cls:'sum' },
+    { label:'Teleop park',           key:'teleopPark' },
+    { label:'Teleop hive tips',      key:'teleopTips' },
+    { label:'Left in cell',          key:'cell' },
+    { label:'Flowers',               key:'flower' },
+    { label:'Garden',                key:'garden' },
+    { label:'Teleop subtotal',       key:'teleop', cls:'sum' },
+    { label:'Penalties awarded',     key:'penalty' },
+    { label:'Total',                 key:'total', cls:'grand' }
+  ];
+
+  function renderBreakdown(red, blue){
+    var html = '';
+    for (var i = 0; i < BREAKDOWN_ROWS.length; i++){
+      var r = BREAKDOWN_ROWS[i];
+      html += '<tr' + (r.cls ? ' class="' + r.cls + '"' : '') + '>' +
+        '<td>' + r.label + '</td>' +
+        '<td>' + red[r.key] + '</td>' +
+        '<td>' + blue[r.key] + '</td>' +
+      '</tr>';
+    }
+    document.getElementById('breakdown-body').innerHTML = html;
+  }
+
+  function thresholds(){
+    function v(id, fallback){
+      var n = parseInt(document.getElementById(id).value, 10);
+      return isNaN(n) ? fallback : n;
+    }
+    return { swarm: v('th-swarm', 16), p1: v('th-p1', 4), p2: v('th-p2', 7) };
+  }
+
+  function rankingPoints(mine, theirs, th){
+    var items = [];
+    var total = 0;
+
+    if (mine.total > theirs.total){ items.push({ name:'Win', note:'3 RP', earned:true }); total += 3; }
+    else if (mine.total === theirs.total){ items.push({ name:'Tie', note:'1 RP', earned:true }); total += 1; }
+    else { items.push({ name:'Win', note:'0 RP', earned:false }); }
+
+    var swarm = mine.swarmPoints >= th.swarm;
+    items.push({ name:'Swarm', note: mine.swarmPoints + '/' + th.swarm + ' pts', earned: swarm });
+    if (swarm) total += 1;
+
+    var p1 = mine.tips >= th.p1;
+    items.push({ name:'Pollinator 1', note: mine.tips + '/' + th.p1 + ' tips', earned: p1 });
+    if (p1) total += 1;
+
+    var p2 = mine.tips >= th.p2;
+    items.push({ name:'Pollinator 2', note: mine.tips + '/' + th.p2 + ' tips', earned: p2 });
+    if (p2) total += 1;
+
+    return { items: items, total: total };
+  }
+
+  function renderRP(elId, rp){
+    var html = '';
+    for (var i = 0; i < rp.items.length; i++){
+      var it = rp.items[i];
+      html += '<li class="' + (it.earned ? 'earned' : '') + '">' +
+        '<span class="rp-dot"></span>' + it.name +
+        '<span class="rp-note">' + it.note + '</span></li>';
+    }
+    document.getElementById(elId).innerHTML = html;
+  }
+
+  var lastSummary = '';
+
+  function recalc(){
+    var red = score('red');
+    var blue = score('blue');
+    var th = thresholds();
+    var redRP = rankingPoints(red, blue, th);
+    var blueRP = rankingPoints(blue, red, th);
+
+    document.getElementById('board-red').textContent = red.total;
+    document.getElementById('board-blue').textContent = blue.total;
+    document.getElementById('board-red-rp').textContent = redRP.total;
+    document.getElementById('board-blue-rp').textContent = blueRP.total;
+    document.getElementById('red-panel-total').textContent = red.total + ' pts';
+    document.getElementById('blue-panel-total').textContent = blue.total + ' pts';
+
+    var result = document.getElementById('board-result');
+    if (red.total > blue.total){ result.textContent = 'Red by ' + (red.total - blue.total); result.setAttribute('data-result','red'); }
+    else if (blue.total > red.total){ result.textContent = 'Blue by ' + (blue.total - red.total); result.setAttribute('data-result','blue'); }
+    else { result.textContent = 'Tied'; result.setAttribute('data-result','tie'); }
+
+    renderBreakdown(red, blue);
+    renderRP('rp-red', redRP);
+    renderRP('rp-blue', blueRP);
+
+    lastSummary =
+      'BIOBUZZ match summary\n' +
+      'Red ' + red.total + ' (' + redRP.total + ' RP)  —  Blue ' + blue.total + ' (' + blueRP.total + ' RP)\n' +
+      'Red: auto ' + red.auto + ', teleop ' + red.teleop + ', penalties awarded ' + red.penalty + ', hive tips ' + red.tips + '\n' +
+      'Blue: auto ' + blue.auto + ', teleop ' + blue.teleop + ', penalties awarded ' + blue.penalty + ', hive tips ' + blue.tips;
+  }
+
+  /* ---------- Events ---------- */
+  document.addEventListener('click', function(e){
+    var toggleBtn = e.target.closest('.toggle');
+    if (toggleBtn){
+      var id = toggleBtn.getAttribute('data-toggle');
+      toggles[id] = !toggles[id];
+      toggleBtn.setAttribute('aria-pressed', toggles[id] ? 'true' : 'false');
+      recalc();
+      return;
+    }
+
+    var stepBtn = e.target.closest('[data-step]');
+    if (stepBtn){
+      var stepper = stepBtn.parentNode;
+      var input = stepper.querySelector('input');
+      input.value = clamp(input, parseInt(input.value, 10) + parseInt(stepBtn.getAttribute('data-step'), 10));
+      syncStepper(stepper, input);
+      recalc();
+      return;
+    }
+
+    var segBtn = e.target.closest('.seg button');
+    if (segBtn){
+      var seg = segBtn.parentNode;
+      var idx = parseInt(seg.getAttribute('data-flower'), 10);
+      var field = seg.getAttribute('data-seg');
+      var buttons = seg.querySelectorAll('button');
+      for (var i = 0; i < buttons.length; i++){
+        buttons[i].setAttribute('aria-pressed', buttons[i] === segBtn ? 'true' : 'false');
+      }
+      flowers[idx][field] = segBtn.getAttribute('data-value');
+      recalc();
+      return;
+    }
+  });
+
+  function syncStepper(stepper, input){
+    var val = clamp(input, parseInt(input.value, 10));
+    input.value = val;
+    if (stepper.hasAttribute('data-stepper')) counts[stepper.getAttribute('data-stepper')] = val;
+    if (stepper.hasAttribute('data-flower-count')) flowers[parseInt(stepper.getAttribute('data-flower-count'), 10)].elements = val;
+  }
+
+  document.addEventListener('input', function(e){
+    if (e.target.tagName !== 'INPUT') return;
+    var stepper = e.target.closest('.stepper');
+    if (stepper){ syncStepper(stepper, e.target); recalc(); return; }
+    if (e.target.closest('.threshold')) recalc();
+  });
+
+  document.getElementById('reset-btn').addEventListener('click', function(){
+    toggles = {};
+    counts = {};
+    for (var i = 0; i < flowers.length; i++) flowers[i] = { owner:'none', elements:0, bottom:'none' };
+
+    var pressed = document.querySelectorAll('.toggle');
+    for (var j = 0; j < pressed.length; j++) pressed[j].setAttribute('aria-pressed','false');
+
+    var inputs = document.querySelectorAll('.stepper input');
+    for (var k = 0; k < inputs.length; k++) inputs[k].value = 0;
+
+    var segButtons = document.querySelectorAll('.seg button');
+    for (var m = 0; m < segButtons.length; m++){
+      segButtons[m].setAttribute('aria-pressed', segButtons[m].getAttribute('data-value') === 'none' ? 'true' : 'false');
+    }
+    recalc();
+  });
+
+  document.getElementById('copy-btn').addEventListener('click', function(){
+    var btn = this;
+    function done(text){
+      var original = 'Copy match summary';
+      btn.textContent = text;
+      setTimeout(function(){ btn.textContent = original; }, 1800);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(lastSummary).then(function(){ done('Copied'); }, function(){ done('Copy failed'); });
+    } else {
+      done('Copy failed');
+    }
+  });
+
+  buildFlowers();
+  recalc();
+})();
+</script>
+</body>
+</html>
