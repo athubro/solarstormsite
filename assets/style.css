@@ -94,11 +94,15 @@ p{ margin: 0 0 1em; color: var(--slate); }
   color: var(--paper);
 }
 .brand-mark{
-  width: 34px; height: 34px; border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 30%, var(--corona), var(--flare) 55%, transparent 70%);
+  width: 34px; 
+  height: 34px; 
+  border-radius: 50%;
+  background-image: url('pictures/logo.png'); /* Replace with your actual file path */
+  background-size: cover;                        /* Scales the image to fill the circle */
+  background-position: center;                 /* Centers the image */
+  background-repeat: no-repeat;                 /* Prevents the image from repeating */
   box-shadow: 0 0 18px rgba(255,106,31,0.55);
-  flex-shrink:0;
+  flex-shrink: 0;
 }
 .brand small{
   display:block; font-family: var(--mono); font-weight:400; font-size:10.5px;
